@@ -2,6 +2,8 @@ from flask import Flask, render_template, session, jsonify, request, flash, redi
 from flask_debugtoolbar import DebugToolbarExtension
 from forex_python.converter import CurrencyRates, RatesNotAvailableError
 
+import requests
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = "secret"
 debug = DebugToolbarExtension(app)
@@ -28,53 +30,43 @@ currency_codes = [
 ]
 
 @app.route('/')
-def home_page():
+def index():
     return render_template ("app.html")
 
 
-from flask import Flask, request, redirect, flash
 
 @app.route('/check_currency', methods=["POST"])
 def check_currency():
     convertFrom = request.form["convertFrom"].upper()
     convertTo = request.form["convertTo"].upper()
-
-
-    if convertFrom in currency_codes and convertTo in currency_codes:
-        return redirect("/conversion")
+    amount = request.form["numberValue"]
     
+    if convertFrom in currency_codes and convertTo in currency_codes:
+                return redirect(f"/conversion/{convertFrom}/{convertTo}/{amount}")
+              
 
     else: 
         flash("Invalid currency codes. Please try again.")
         return redirect("/")
 
         
-    # for currency in currencies:
-    #     if currency.alpha_3 == convertFrom.upper():
-    #         return redirect ("/conversion")
-    #     else: 
-    #         return "this is invalid!"
+  
 
-@app.route("/conversion")
-def conversion():
-
-    c = CurrencyRates()
-    converted_value = (c.convert('USD', 'LBP', 10))
-
-    return str(converted_value)
-
-# @app.route("/conversion")
-# def conversion():
-
-#     c = CurrencyRates()
-
-#     try:
-#         converted_value = c.convert("USD", "INR", 10)
-#     except RatesNotAvailableError:
-#         return "Currency rates are not available at this time. Please try again later."
-
-#     return str(converted_value)
+@app.route('/conversion/<convertFrom>/<convertTo>/<amount>')
+def conversion(convertFrom, convertTo, amount):
 
 
-#     # print(c.get_rate('USD', 'INR'))
-    
+    exchange_rate_url = f'https://api.exchangerate.host/convert?from={convertFrom}&to={convertTo}'
+    response = requests.get(exchange_rate_url)
+
+    if response.status_code == 200:
+        exchange_rate = response.json()['result']
+
+        converted_amount = exchange_rate * float(amount)
+        rounded_amount = round(converted_amount,2)
+        return (f"{convertTo} {str(rounded_amount)} <br><br> <a href='/'>Home</a>")
+
+
+    else:
+        return jsonify({'error': 'Unable to retrieve exchange rate'}), 500
+
